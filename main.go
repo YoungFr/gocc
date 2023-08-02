@@ -10,7 +10,7 @@ import (
 // 定位错误所在位置
 func locateError(offset int) {
 	fmt.Fprintln(os.Stderr, source)
-	fmt.Fprintf(os.Stderr, "%*s^ ", offset, "")
+	fmt.Fprintf(os.Stderr, "%*s\033[31m^ \033[0m", offset, "")
 }
 
 // 词法分析 Tokenizer
@@ -43,7 +43,7 @@ func equal(token *Token, lexeme string) bool {
 func skip(token *Token, lexeme string) *Token {
 	if !equal(token, lexeme) {
 		locateError(token.begin)
-		fmt.Fprintf(os.Stderr, "expected \"%s\"\n", lexeme)
+		fmt.Fprintf(os.Stderr, "\033[31mexpected \"%s\"\n\033[0m", lexeme)
 		os.Exit(1)
 	}
 	return token.next
@@ -95,7 +95,7 @@ func tokenize() *Token {
 			p++
 		default:
 			locateError(p)
-			fmt.Fprintln(os.Stderr, "invalid token")
+			fmt.Fprintln(os.Stderr, "\033[31minvalid token\033[0m")
 			os.Exit(1)
 		}
 	}
@@ -186,7 +186,7 @@ func primary(rest **Token, token *Token) (node *Node) {
 		return
 	}
 	locateError(token.begin)
-	fmt.Fprintln(os.Stderr, "expected an expression")
+	fmt.Fprintln(os.Stderr, "\033[31mexpected an expression\033[0m")
 	os.Exit(1)
 	return
 }
@@ -194,7 +194,7 @@ func primary(rest **Token, token *Token) (node *Node) {
 // 代码生成 Code generator
 
 func push() {
-	fmt.Printf("  push %%rax\n")
+	fmt.Println("  push %rax")
 }
 
 func pop(arg string) {
@@ -212,24 +212,24 @@ func gen(node *Node) {
 	pop("%rdi")
 	switch node.kind {
 	case NodeAdd:
-		fmt.Printf("  add %%rdi, %%rax\n")
+		fmt.Println("  add %rdi, %rax")
 		return
 	case NodeSub:
-		fmt.Printf("  sub %%rdi, %%rax\n")
+		fmt.Println("  sub %rdi, %rax")
 		return
 	case NodeMul:
-		fmt.Printf("  imul %%rdi, %%rax\n")
+		fmt.Println("  imul %rdi, %rax")
 		return
 	case NodeDiv:
-		fmt.Printf("  cqo\n")
-		fmt.Printf("  idiv %%rdi\n")
+		fmt.Println("  cqo")
+		fmt.Println("  idiv %rdi")
 		return
 	}
 }
 
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "expected 2 arguments but got %d", len(os.Args))
+		fmt.Fprintf(os.Stderr, "\033[31mexpected 2 arguments but got %d\n\033[0m", len(os.Args))
 		os.Exit(1)
 	}
 
@@ -238,12 +238,11 @@ func main() {
 	node := expr(&token, token)
 	if token.kind != TokenEof {
 		locateError(token.begin)
-		fmt.Fprintln(os.Stderr, "extra token")
+		fmt.Fprintln(os.Stderr, "\033[31mextra token\033[0m")
 		os.Exit(1)
 	}
 
-	fmt.Printf("  .globl main\n")
-	fmt.Printf("main:\n")
+	fmt.Println("  .globl main\nmain:")
 	gen(node)
-	fmt.Printf("  ret\n")
+	fmt.Println("  ret")
 }
