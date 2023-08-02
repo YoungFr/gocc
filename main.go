@@ -7,14 +7,24 @@ import (
 	"unicode"
 )
 
+// 定位错误所在位置
+func locateError(offset int) {
+	fmt.Fprintln(os.Stderr, source)
+	fmt.Fprintf(os.Stderr, "%*s^ ", offset, "")
+}
+
+// 词法分析 Tokenizer
+
 // token -> 词法单元
 
 type TokenKind int
 
 const (
-	TokenOperator TokenKind = iota
-	TokenNum
-	TokenEof
+	TokenOperator TokenKind = iota // + - * /
+	TokenLparen                    // (
+	TokenRparen                    // )
+	TokenNum                       // number
+	TokenEof                       // EOF
 )
 
 type Token struct {
@@ -24,11 +34,6 @@ type Token struct {
 	begin  int       // 词素的起始索引
 	length int       // 词素的长度
 	lexeme string    // 词素
-}
-
-func locateError(offset int) {
-	fmt.Fprintln(os.Stderr, source)
-	fmt.Fprintf(os.Stderr, "%*s^ ", offset, "")
 }
 
 func equal(token *Token, lexeme string) bool {
@@ -42,15 +47,6 @@ func skip(token *Token, lexeme string) *Token {
 		os.Exit(1)
 	}
 	return token.next
-}
-
-func getNumber(token *Token) int {
-	if token.kind != TokenNum {
-		locateError(token.begin)
-		fmt.Fprintln(os.Stderr, "expected a number")
-		os.Exit(1)
-	}
-	return token.value
 }
 
 func NewToken(kind TokenKind, begin int, end int) *Token {
@@ -67,16 +63,16 @@ func NewToken(kind TokenKind, begin int, end int) *Token {
 // 输入字符串
 var source string
 
+// 将所有词法单元组织成一个单链表并返回指向第一个词法单元的指针
 func tokenize() *Token {
 	head := Token{}
 	curr := &head
 	p := 0
 	for p < len(source) {
-		if unicode.IsSpace(rune(source[p])) {
+		switch {
+		case unicode.IsSpace(rune(source[p])):
 			p++
-			continue
-		}
-		if unicode.IsDigit(rune(source[p])) {
+		case unicode.IsDigit(rune(source[p])):
 			q := p
 			for p < len(source) && unicode.IsDigit(rune(source[p])) {
 				p++
@@ -85,22 +81,150 @@ func tokenize() *Token {
 			curr = curr.next
 			value, _ := strconv.Atoi(curr.lexeme)
 			curr.value = value
-			continue
-		}
-		if source[p] == '+' || source[p] == '-' {
+		case source[p] == '+' || source[p] == '-' || source[p] == '*' || source[p] == '/':
 			curr.next = NewToken(TokenOperator, p, p+1)
 			curr = curr.next
 			p++
-			continue
+		case source[p] == '(':
+			curr.next = NewToken(TokenLparen, p, p+1)
+			curr = curr.next
+			p++
+		case source[p] == ')':
+			curr.next = NewToken(TokenRparen, p, p+1)
+			curr = curr.next
+			p++
+		default:
+			locateError(p)
+			fmt.Fprintln(os.Stderr, "invalid token")
+			os.Exit(1)
 		}
-		locateError(p)
-		fmt.Fprintln(os.Stderr, "invalid token")
-		os.Exit(1)
 	}
 	curr.next = NewToken(TokenEof, p, p)
-	curr = curr.next
-	curr.lexeme = "EOF"
 	return head.next
+}
+
+// 语法分析 Parser
+
+type NodeKind int
+
+const (
+	NodeAdd NodeKind = iota
+	NodeSub
+	NodeMul
+	NodeDiv
+	NodeNum
+)
+
+type Node struct {
+	kind  NodeKind
+	lhs   *Node
+	rhs   *Node
+	value int // 当 Node 的类型是 NodeNum 时整数的值
+}
+
+func NewNode(kind NodeKind) *Node {
+	return &Node{kind: kind}
+}
+
+func NewBinary(kind NodeKind, lhs *Node, rhs *Node) *Node {
+	node := NewNode(kind)
+	node.lhs = lhs
+	node.rhs = rhs
+	return node
+}
+
+func NewNumber(value int) *Node {
+	node := NewNode(NodeNum)
+	node.value = value
+	return node
+}
+
+// expr -> mul ( "+" mul | "-" mul )*
+func expr(rest **Token, token *Token) (node *Node) {
+	node = mul(&token, token)
+	for {
+		if equal(token, "+") {
+			node = NewBinary(NodeAdd, node, mul(&token, token.next))
+			continue
+		}
+		if equal(token, "-") {
+			node = NewBinary(NodeSub, node, mul(&token, token.next))
+			continue
+		}
+		*rest = token
+		return
+	}
+}
+
+// mul -> primary ( "*" primary | "/" primary )*
+func mul(rest **Token, token *Token) (node *Node) {
+	node = primary(&token, token)
+	for {
+		if equal(token, "*") {
+			node = NewBinary(NodeMul, node, primary(&token, token.next))
+			continue
+		}
+		if equal(token, "/") {
+			node = NewBinary(NodeDiv, node, primary(&token, token.next))
+			continue
+		}
+		*rest = token
+		return
+	}
+}
+
+// primary -> number | "(" expr ")"
+func primary(rest **Token, token *Token) (node *Node) {
+	if equal(token, "(") {
+		node = expr(&token, token.next)
+		*rest = skip(token, ")")
+		return
+	}
+	if token.kind == TokenNum {
+		node = NewNumber(token.value)
+		*rest = token.next
+		return
+	}
+	locateError(token.begin)
+	fmt.Fprintln(os.Stderr, "expected an expression")
+	os.Exit(1)
+	return
+}
+
+// 代码生成 Code generator
+
+func push() {
+	fmt.Printf("  push %%rax\n")
+}
+
+func pop(arg string) {
+	fmt.Printf("  pop %s\n", arg)
+}
+
+func gen(node *Node) {
+	if node.kind == NodeNum {
+		fmt.Printf("  mov $%d, %%rax\n", node.value)
+		return
+	}
+	gen(node.rhs)
+	push()
+	gen(node.lhs)
+	pop("%rdi")
+	switch node.kind {
+	case NodeAdd:
+		fmt.Printf("  add %%rdi, %%rax\n")
+		return
+	case NodeSub:
+		fmt.Printf("  sub %%rdi, %%rax\n")
+		return
+	case NodeMul:
+		fmt.Printf("  imul %%rdi, %%rax\n")
+		return
+	case NodeDiv:
+		fmt.Printf("  cqo\n")
+		fmt.Printf("  idiv %%rdi\n")
+		return
+	}
 }
 
 func main() {
@@ -111,22 +235,15 @@ func main() {
 
 	source = os.Args[1]
 	token := tokenize()
+	node := expr(&token, token)
+	if token.kind != TokenEof {
+		locateError(token.begin)
+		fmt.Fprintln(os.Stderr, "extra token")
+		os.Exit(1)
+	}
 
 	fmt.Printf("  .globl main\n")
 	fmt.Printf("main:\n")
-	fmt.Printf("  mov $%d, %%rax\n", getNumber(token))
-	token = token.next
-
-	for token.kind != TokenEof {
-		if equal(token, "+") {
-			fmt.Printf("  add $%d, %%rax\n", getNumber(token.next))
-			token = token.next.next
-			continue
-		}
-		token = skip(token, "-")
-		fmt.Printf("  sub $%d, %%rax\n", getNumber(token))
-		token = token.next
-	}
-
+	gen(node)
 	fmt.Printf("  ret\n")
 }

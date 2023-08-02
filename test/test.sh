@@ -16,8 +16,13 @@ assert() {
   fi
 }
 
-assert 3 "3"
-assert 4 "2+2"
-assert 5 "2+4-1"
+assert 0 "0"
+assert 1 "0 + 1"
+assert 2 "2 - 0"
+assert 4 "1 + 1 + 2"
+assert 5 "(3+3) - 1"
+assert 6 "2 * (30 - 28) + (2 / 1)"
+assert 7 "((1+2) * 3) - (3 - (1/1))"
+assert 8 "(2+1) * (3+1) / (14 / 7) + (4-2)"
 
 echo OK
