@@ -79,7 +79,12 @@ func tokenize() *Token {
 			}
 			curr.next = NewToken(TokenNum, q, p)
 			curr = curr.next
-			value, _ := strconv.Atoi(curr.lexeme)
+			value, err := strconv.Atoi(curr.lexeme)
+			if err != nil {
+				locateError((q + p) / 2)
+				fmt.Fprintf(os.Stderr, "\033[31m%s\n\033[0m", err.Error()[len("strconv.Atoi: "):])
+				os.Exit(1)
+			}
 			curr.value = value
 		case source[p] == '+' || source[p] == '-' || source[p] == '*' || source[p] == '/':
 			curr.next = NewToken(TokenOperator, p, p+1)
@@ -112,6 +117,7 @@ const (
 	NodeSub
 	NodeMul
 	NodeDiv
+	NodeNeg
 	NodeNum
 )
 
@@ -139,6 +145,12 @@ func NewNumber(value int) *Node {
 	return node
 }
 
+func NewUnary(kind NodeKind, expr *Node) *Node {
+	node := NewNode(kind)
+	node.lhs = expr
+	return node
+}
+
 // expr -> mul ( "+" mul | "-" mul )*
 func expr(rest **Token, token *Token) (node *Node) {
 	node = mul(&token, token)
@@ -156,21 +168,32 @@ func expr(rest **Token, token *Token) (node *Node) {
 	}
 }
 
-// mul -> primary ( "*" primary | "/" primary )*
+// mul -> unary ( "*" unary | "/" unary )*
 func mul(rest **Token, token *Token) (node *Node) {
-	node = primary(&token, token)
+	node = unary(&token, token)
 	for {
 		if equal(token, "*") {
-			node = NewBinary(NodeMul, node, primary(&token, token.next))
+			node = NewBinary(NodeMul, node, unary(&token, token.next))
 			continue
 		}
 		if equal(token, "/") {
-			node = NewBinary(NodeDiv, node, primary(&token, token.next))
+			node = NewBinary(NodeDiv, node, unary(&token, token.next))
 			continue
 		}
 		*rest = token
 		return
 	}
+}
+
+// unary -> ( "+" | "-" ) unary | primary
+func unary(rest **Token, token *Token) *Node {
+	if equal(token, "+") {
+		return unary(rest, token.next)
+	}
+	if equal(token, "-") {
+		return NewUnary(NodeNeg, unary(rest, token.next))
+	}
+	return primary(rest, token)
 }
 
 // primary -> number | "(" expr ")"
@@ -202,8 +225,13 @@ func pop(arg string) {
 }
 
 func gen(node *Node) {
-	if node.kind == NodeNum {
+	switch node.kind {
+	case NodeNum:
 		fmt.Printf("  mov $%d, %%rax\n", node.value)
+		return
+	case NodeNeg:
+		gen(node.lhs)
+		fmt.Println("  neg %rax")
 		return
 	}
 	gen(node.rhs)
