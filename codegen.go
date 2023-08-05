@@ -16,10 +16,18 @@ func pop(arg string) {
 }
 
 func gen(node *Node) {
-	fmt.Println("  .globl main\nmain:")
+	fmt.Println("  .globl main")
+	fmt.Println("main:")
+	fmt.Println("  push %rbp")
+	fmt.Println("  mov %rsp, %rbp")
+	// 208 == ('z' - 'a' + 1) * 8, it's the stack size for
+	// all possible single-letter 64 bit integer variables.
+	fmt.Println("  sub $208, %rsp")
 	for n := node; n != nil; n = n.next {
 		genStmt(n)
 	}
+	fmt.Println("  mov %rbp, %rsp")
+	fmt.Println("  pop %rbp")
 	fmt.Println("  ret")
 }
 
@@ -32,6 +40,15 @@ func genStmt(node *Node) {
 	os.Exit(1)
 }
 
+func genAddr(node *Node) {
+	if node.kind == NodeVar {
+		offset := (node.name[0] - 'a' + 1) * 8
+		fmt.Printf("  lea %d(%%rbp), %%rax\n", -offset)
+		return
+	}
+	fmt.Fprintln(os.Stderr, "not a lvalue")
+}
+
 func genExpr(node *Node) {
 	switch node.kind {
 	case NodeNum:
@@ -40,6 +57,17 @@ func genExpr(node *Node) {
 	case NodeNeg:
 		genExpr(node.lhs)
 		fmt.Println("  neg %rax")
+		return
+	case NodeVar:
+		genAddr(node)
+		fmt.Println("  mov (%rax), %rax")
+		return
+	case NodeAsg:
+		genAddr(node.lhs)
+		push()
+		genExpr(node.rhs)
+		pop("%rdi")
+		fmt.Println("  mov %rax, (%rdi)")
 		return
 	}
 	genExpr(node.rhs)

@@ -48,4 +48,10 @@ assert 0 '1>=2;'
 
 assert 3 '1; 2; 3;'
 
+assert 3 'a=3; a;'
+assert 8 'a=3; z=5; a+z;'
+assert 6 'a=b=3; a+b;'
+assert 0 'a=1; b=1; c=1; a-(b-c)-a;'
+assert 9 'a=b=1; c=d=1+1; a*2+b+3*d;'
+
 echo OK

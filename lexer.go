@@ -27,6 +27,7 @@ const (
 	TokenLparen                  // (
 	TokenRparen                  // )
 	TokenSemi                    // ;
+	TokenIdent                   // identifier
 	TokenNum                     // number
 	TokenEof                     // EOF
 )
@@ -195,6 +196,10 @@ func tokenize() *Token {
 			curr.next = NewToken(TokenSemi, p, p+1)
 			curr = curr.next
 			p++
+		case isLetter(source[p]):
+			curr.next = NewToken(TokenIdent, p, p+1)
+			curr = curr.next
+			p++
 		default:
 			locateError(p)
 			fmt.Fprintln(os.Stderr, "\033[31minvalid token\033[0m")
@@ -203,4 +208,8 @@ func tokenize() *Token {
 	}
 	curr.next = NewToken(TokenEof, p, p)
 	return head.next
+}
+
+func isLetter(c byte) bool {
+	return c >= 'a' && c <= 'z'
 }

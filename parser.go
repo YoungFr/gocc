@@ -20,6 +20,8 @@ const (
 	NodeLss                      // lhs < rhs
 	NodeLeq                      // lhs <= rhs
 	NodeExprStmt                 // lhs ; (expression statement)
+	NodeAsg                      // lhs = rhs
+	NodeVar                      // variable
 	NodeNum                      // number
 )
 
@@ -28,6 +30,7 @@ type Node struct {
 	next  *Node    // Next node
 	lhs   *Node    // Left-hand side
 	rhs   *Node    // Right-hand side
+	name  string   // If kind == NodeVar, variable's name
 	value int      // If kind == NodeNum, its value
 }
 
@@ -54,6 +57,12 @@ func NewUnary(kind NodeKind, expr *Node) *Node {
 	return node
 }
 
+func NewVar(name string) *Node {
+	node := NewNode(NodeVar)
+	node.name = name
+	return node
+}
+
 func parse(token *Token) *Node {
 	head := Node{}
 	curr := &head
@@ -76,9 +85,19 @@ func exprStmt(rest **Token, token *Token) (node *Node) {
 	return
 }
 
-// expr -> equality
+// expr -> assign
 func expr(rest **Token, token *Token) *Node {
-	return equality(rest, token)
+	return assign(rest, token)
+}
+
+// assign -> equality ( "=" assign )?
+func assign(rest **Token, token *Token) (node *Node) {
+	node = equality(&token, token)
+	if equal(token, "=") {
+		node = NewBinary(NodeAsg, node, assign(&token, token.next))
+	}
+	*rest = token
+	return
 }
 
 // equality -> relational ( "==" relational | "!=" relational )*
@@ -168,7 +187,7 @@ func unary(rest **Token, token *Token) *Node {
 	return primary(rest, token)
 }
 
-// primary -> number | "(" expr ")"
+// primary -> number | "(" expr ")" | ident
 func primary(rest **Token, token *Token) (node *Node) {
 	if equal(token, "(") {
 		node = expr(&token, token.next)
@@ -177,6 +196,11 @@ func primary(rest **Token, token *Token) (node *Node) {
 	}
 	if token.kind == TokenNum {
 		node = NewNumber(token.value)
+		*rest = token.next
+		return
+	}
+	if token.kind == TokenIdent {
+		node = NewVar(token.lexeme)
 		*rest = token.next
 		return
 	}
