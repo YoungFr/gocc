@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 // Code generator
 
@@ -13,18 +16,35 @@ func pop(arg string) {
 }
 
 func gen(node *Node) {
+	fmt.Println("  .globl main\nmain:")
+	for n := node; n != nil; n = n.next {
+		genStmt(n)
+	}
+	fmt.Println("  ret")
+}
+
+func genStmt(node *Node) {
+	if node.kind == NodeExprStmt {
+		genExpr(node.lhs)
+		return
+	}
+	fmt.Fprintln(os.Stderr, "invalid statement")
+	os.Exit(1)
+}
+
+func genExpr(node *Node) {
 	switch node.kind {
 	case NodeNum:
 		fmt.Printf("  mov $%d, %%rax\n", node.value)
 		return
 	case NodeNeg:
-		gen(node.lhs)
+		genExpr(node.lhs)
 		fmt.Println("  neg %rax")
 		return
 	}
-	gen(node.rhs)
+	genExpr(node.rhs)
 	push()
-	gen(node.lhs)
+	genExpr(node.lhs)
 	pop("%rdi")
 	switch node.kind {
 	case NodeAdd:

@@ -10,20 +10,22 @@ import (
 type NodeKind int
 
 const (
-	NodeAdd NodeKind = iota // lhs + rhs
-	NodeSub                 // lhs - rhs
-	NodeMul                 // lhs * rhs
-	NodeDiv                 // lhs / rhs
-	NodeNeg                 // - lhs
-	NodeEql                 // lhs == rhs
-	NodeNeq                 // lhs != rhs
-	NodeLss                 // lhs < rhs
-	NodeLeq                 // lhs <= rhs
-	NodeNum                 // number
+	NodeAdd      NodeKind = iota // lhs + rhs
+	NodeSub                      // lhs - rhs
+	NodeMul                      // lhs * rhs
+	NodeDiv                      // lhs / rhs
+	NodeNeg                      // - lhs
+	NodeEql                      // lhs == rhs
+	NodeNeq                      // lhs != rhs
+	NodeLss                      // lhs < rhs
+	NodeLeq                      // lhs <= rhs
+	NodeExprStmt                 // lhs ; (expression statement)
+	NodeNum                      // number
 )
 
 type Node struct {
 	kind  NodeKind // Node kind
+	next  *Node    // Next node
 	lhs   *Node    // Left-hand side
 	rhs   *Node    // Right-hand side
 	value int      // If kind == NodeNum, its value
@@ -50,6 +52,28 @@ func NewUnary(kind NodeKind, expr *Node) *Node {
 	node := NewNode(kind)
 	node.lhs = expr
 	return node
+}
+
+func parse(token *Token) *Node {
+	head := Node{}
+	curr := &head
+	for token.kind != TokenEof {
+		curr.next = stmt(&token, token)
+		curr = curr.next
+	}
+	return head.next
+}
+
+// stmt -> exprStmt
+func stmt(rest **Token, token *Token) *Node {
+	return exprStmt(rest, token)
+}
+
+// exprStmt -> expr ";"
+func exprStmt(rest **Token, token *Token) (node *Node) {
+	node = NewUnary(NodeExprStmt, expr(&token, token))
+	*rest = skip(token, ";")
+	return
 }
 
 // expr -> equality

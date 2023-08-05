@@ -26,6 +26,7 @@ const (
 	TokenGeq                     // >=
 	TokenLparen                  // (
 	TokenRparen                  // )
+	TokenSemi                    // ;
 	TokenNum                     // number
 	TokenEof                     // EOF
 )
@@ -188,6 +189,10 @@ func tokenize() *Token {
 			p++
 		case source[p] == ')':
 			curr.next = NewToken(TokenRparen, p, p+1)
+			curr = curr.next
+			p++
+		case source[p] == ';':
+			curr.next = NewToken(TokenSemi, p, p+1)
 			curr = curr.next
 			p++
 		default:

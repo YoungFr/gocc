@@ -20,14 +20,6 @@ func main() {
 
 	source = os.Args[1]
 	token := tokenize()
-	node := expr(&token, token)
-	if token.kind != TokenEof {
-		locateError(token.begin)
-		fmt.Fprintln(os.Stderr, "\033[31mextra token\033[0m")
-		os.Exit(1)
-	}
-
-	fmt.Println("  .globl main\nmain:")
+	node := parse(token)
 	gen(node)
-	fmt.Println("  ret")
 }
