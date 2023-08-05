@@ -31,6 +31,8 @@ const (
 	SEMI                      // ;
 	IDENT                     // identifier
 	RETURN                    // return
+	IF                        // if
+	ELSE                      // else
 	NUM                       // number
 	EOF                       // EOF
 )
@@ -230,6 +232,8 @@ func tokenize() *Token {
 
 var keywords = map[string]TokenKind{
 	"return": RETURN,
+	"if":     IF,
+	"else":   ELSE,
 }
 
 func isLetter(c byte) bool {

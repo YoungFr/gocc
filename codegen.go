@@ -7,6 +7,21 @@ import (
 
 // Code generator
 
+func init() {
+	counter = makecounter()
+}
+
+var counter func() int
+
+func makecounter() func() int {
+	i := 1
+	return func() int {
+		t := i
+		i++
+		return t
+	}
+}
+
 func push() {
 	fmt.Println("  push %rax")
 }
@@ -60,6 +75,19 @@ func genStmt(node *Node) {
 	case NodeReturn:
 		genExpr(node.lhs)
 		fmt.Println("  jmp .L.return")
+		return
+	case NodeIf:
+		c := counter()
+		genExpr(node.condition)
+		fmt.Println("  cmp $0, %rax")
+		fmt.Printf("  je  .L.else.%d\n", c)
+		genStmt(node.thenBranch)
+		fmt.Printf("  jmp .L.end.%d\n", c)
+		fmt.Printf(".L.else.%d:\n", c)
+		if node.elseBranch != nil {
+			genStmt(node.elseBranch)
+		}
+		fmt.Printf(".L.end.%d:\n", c)
 		return
 	}
 	fmt.Fprintln(os.Stderr, "invalid statement")

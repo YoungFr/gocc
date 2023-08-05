@@ -20,9 +20,10 @@ const (
 	NodeLss                      // lhs < rhs
 	NodeLeq                      // lhs <= rhs
 	NodeAsg                      // lhs = rhs
-	NodeExprStmt                 // lhs ; (expression statement)
-	NodeReturn                   // "return" lhs ; (return statement)
-	NodeBlock                    // { body } (block statement)
+	NodeExprStmt                 // expression statement
+	NodeReturn                   // return statement
+	NodeBlock                    // block statement
+	NodeIf                       // if statement
 	NodeVar                      // variable
 	NodeNum                      // number
 )
@@ -66,13 +67,26 @@ type Function struct {
 }
 
 type Node struct {
-	kind     NodeKind // Node kind
-	next     *Node    // Next node
-	lhs      *Node    // Left-hand side
-	rhs      *Node    // Right-hand side
-	body     *Node    // Used if kind == NodeBlock, list of statements
-	variable *Object  // Used if kind == NodeVar, its struct representation
-	value    int      // Used if kind == NodeNum, its value
+	kind NodeKind // Node kind
+	next *Node    // Next node
+	lhs  *Node    // Left-hand side
+	rhs  *Node    // Right-hand side
+
+	// Used if kind == NodeIf
+	condition  *Node
+	thenBranch *Node
+	elseBranch *Node
+
+	// Used if kind == NodeBlock
+	// The list of statements within the block
+	body *Node
+
+	// Used if kind == NodeVar
+	// Variable's struct representation
+	variable *Object
+
+	// Used if kind == NodeNum
+	value int
 }
 
 func NewNode(kind NodeKind) *Node {
@@ -121,6 +135,7 @@ func parse(token *Token) *Function {
 
 // stmt -> "return" expr ";"
 // -->   | "{" block
+// -->   | "if" "(" expr ")" stmt ( "else" stmt )?
 // -->   | exprStmt
 func stmt(rest **Token, token *Token) *Node {
 	if equal(token, "return") {
@@ -130,6 +145,18 @@ func stmt(rest **Token, token *Token) *Node {
 	}
 	if equal(token, "{") {
 		return block(rest, token.next)
+	}
+	if equal(token, "if") {
+		node := NewNode(NodeIf)
+		token = skip(token.next, "(")
+		node.condition = expr(&token, token)
+		token = skip(token, ")")
+		node.thenBranch = stmt(&token, token)
+		if equal(token, "else") {
+			node.elseBranch = stmt(&token, token.next)
+		}
+		*rest = token
+		return node
 	}
 	return exprStmt(rest, token)
 }
