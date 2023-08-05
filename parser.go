@@ -19,14 +19,15 @@ const (
 	NodeNeq                      // lhs != rhs
 	NodeLss                      // lhs < rhs
 	NodeLeq                      // lhs <= rhs
-	NodeExprStmt                 // lhs ; (expression statement)
 	NodeAsg                      // lhs = rhs
-	NodeReturn                   // return lhs ; (return statement)
+	NodeExprStmt                 // lhs ; (expression statement)
+	NodeReturn                   // "return" lhs ; (return statement)
+	NodeBlock                    // { body } (block statement)
 	NodeVar                      // variable
 	NodeNum                      // number
 )
 
-// Object Local variable
+// Object represents a local variable.
 type Object struct {
 	next   *Object // Next object
 	name   string  // Variable name
@@ -37,7 +38,8 @@ type Object struct {
 // parsing are accumulated to this list.
 var locals *Object
 
-// NewLvar Create a new local variable instance.
+// NewLvar creates a new local variable instance
+// and inserts it into the head of the `locals` list.
 func NewLvar(name string) *Object {
 	variable := &Object{
 		next: locals,
@@ -68,6 +70,7 @@ type Node struct {
 	next     *Node    // Next node
 	lhs      *Node    // Left-hand side
 	rhs      *Node    // Right-hand side
+	body     *Node    // Used if kind == NodeBlock, list of statements
 	variable *Object  // Used if kind == NodeVar, its struct representation
 	value    int      // Used if kind == NodeNum, its value
 }
@@ -101,7 +104,7 @@ func NewVar(variable *Object) *Node {
 	return node
 }
 
-// program -> stmt*
+// program -> stmt* EOF
 func parse(token *Token) *Function {
 	head := Node{}
 	curr := &head
@@ -117,6 +120,7 @@ func parse(token *Token) *Function {
 }
 
 // stmt -> "return" expr ";"
+// -->   | "{" block
 // -->   | exprStmt
 func stmt(rest **Token, token *Token) *Node {
 	if equal(token, "return") {
@@ -124,14 +128,35 @@ func stmt(rest **Token, token *Token) *Node {
 		*rest = skip(token, ";")
 		return node
 	}
+	if equal(token, "{") {
+		return block(rest, token.next)
+	}
 	return exprStmt(rest, token)
 }
 
-// exprStmt -> expr ";"
-func exprStmt(rest **Token, token *Token) (node *Node) {
-	node = NewUnary(NodeExprStmt, expr(&token, token))
+// block -> stmt* "}"
+func block(rest **Token, token *Token) *Node {
+	head := Node{}
+	curr := &head
+	for token.kind != EOF && !equal(token, "}") {
+		curr.next = stmt(&token, token)
+		curr = curr.next
+	}
+	node := NewNode(NodeBlock)
+	node.body = head.next
+	*rest = skip(token, "}")
+	return node
+}
+
+// exprStmt -> expr? ";"
+func exprStmt(rest **Token, token *Token) *Node {
+	if equal(token, ";") {
+		*rest = token.next
+		return NewNode(NodeBlock)
+	}
+	node := NewUnary(NodeExprStmt, expr(&token, token))
 	*rest = skip(token, ";")
-	return
+	return node
 }
 
 // expr -> assign
@@ -225,7 +250,8 @@ func muldiv(rest **Token, token *Token) (node *Node) {
 	}
 }
 
-// unary -> ( "+" | "-" ) unary | primary
+// unary -> ( "+" | "-" ) unary
+// -->    | primary
 func unary(rest **Token, token *Token) *Node {
 	if equal(token, "+") {
 		return unary(rest, token.next)
@@ -236,7 +262,9 @@ func unary(rest **Token, token *Token) *Node {
 	return primary(rest, token)
 }
 
-// primary -> number | "(" expr ")" | ident
+// primary -> "(" expr ")"
+// -->      | number
+// -->      | ident
 func primary(rest **Token, token *Token) (node *Node) {
 	if equal(token, "(") {
 		node = expr(&token, token.next)

@@ -52,6 +52,11 @@ func genStmt(node *Node) {
 	case NodeExprStmt:
 		genExpr(node.lhs)
 		return
+	case NodeBlock:
+		for n := node.body; n != nil; n = n.next {
+			genStmt(n)
+		}
+		return
 	case NodeReturn:
 		genExpr(node.lhs)
 		fmt.Println("  jmp .L.return")

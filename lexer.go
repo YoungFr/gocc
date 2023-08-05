@@ -12,25 +12,27 @@ import (
 type TokenKind int
 
 const (
-	ADD    TokenKind = iota // +
-	SUB                     // -
-	MUL                     // *
-	DIV                     // /
-	ASG                     // =
-	EQL                     // ==
-	NOT                     // !
-	NEQ                     // !=
-	LSS                     // <
-	LEQ                     // <=
-	GTR                     // >
-	GEQ                     // >=
-	LPAREN                  // (
-	RPAREN                  // )
-	SEMI                    // ;
-	IDENT                   // identifier
-	RETURN                  // return
-	NUM                     // number
-	EOF                     // EOF
+	ADD      TokenKind = iota // +
+	SUB                       // -
+	ASTERISK                  // *
+	DIV                       // /
+	ASG                       // =
+	EQL                       // ==
+	NOT                       // !
+	NEQ                       // !=
+	LSS                       // <
+	LEQ                       // <=
+	GTR                       // >
+	GEQ                       // >=
+	LPAREN                    // (
+	RPAREN                    // )
+	LBRACE                    // {
+	RBRACE                    // }
+	SEMI                      // ;
+	IDENT                     // identifier
+	RETURN                    // return
+	NUM                       // number
+	EOF                       // EOF
 )
 
 type Token struct {
@@ -129,7 +131,7 @@ func tokenize() *Token {
 			switch {
 			case lookahead(p, '=') == 2:
 			case lookahead(p) == 1:
-				curr.next = NewToken(MUL, p, p+1)
+				curr.next = NewToken(ASTERISK, p, p+1)
 				p += 1
 			}
 			curr = curr.next
@@ -191,6 +193,14 @@ func tokenize() *Token {
 			p++
 		case source[p] == ')':
 			curr.next = NewToken(RPAREN, p, p+1)
+			curr = curr.next
+			p++
+		case source[p] == '{':
+			curr.next = NewToken(LBRACE, p, p+1)
+			curr = curr.next
+			p++
+		case source[p] == '}':
+			curr.next = NewToken(RBRACE, p, p+1)
 			curr = curr.next
 			p++
 		case source[p] == ';':
