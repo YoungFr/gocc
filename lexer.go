@@ -12,30 +12,31 @@ import (
 type TokenKind int
 
 const (
-	TokenAdd    TokenKind = iota // +
-	TokenSub                     // -
-	TokenMul                     // *
-	TokenDiv                     // /
-	TokenAsg                     // =
-	TokenEql                     // ==
-	TokenNot                     // !
-	TokenNeq                     // !=
-	TokenLss                     // <
-	TokenLeq                     // <=
-	TokenGtr                     // >
-	TokenGeq                     // >=
-	TokenLparen                  // (
-	TokenRparen                  // )
-	TokenSemi                    // ;
-	TokenIdent                   // identifier
-	TokenNum                     // number
-	TokenEof                     // EOF
+	ADD    TokenKind = iota // +
+	SUB                     // -
+	MUL                     // *
+	DIV                     // /
+	ASG                     // =
+	EQL                     // ==
+	NOT                     // !
+	NEQ                     // !=
+	LSS                     // <
+	LEQ                     // <=
+	GTR                     // >
+	GEQ                     // >=
+	LPAREN                  // (
+	RPAREN                  // )
+	SEMI                    // ;
+	IDENT                   // identifier
+	RETURN                  // return
+	NUM                     // number
+	EOF                     // EOF
 )
 
 type Token struct {
 	kind   TokenKind // Token kind
 	next   *Token    // Next token
-	value  int       // If kind == TokenNum, its value
+	value  int       // If kind == NUM, its value
 	begin  int       // Starting index of lexeme
 	length int       // Length of lexeme
 	lexeme string    // A substring in the source that matches the pattern for a token
@@ -96,7 +97,7 @@ func tokenize() *Token {
 			for p < len(source) && unicode.IsDigit(rune(source[p])) {
 				p++
 			}
-			curr.next = NewToken(TokenNum, q, p)
+			curr.next = NewToken(NUM, q, p)
 			curr = curr.next
 			value, err := strconv.Atoi(curr.lexeme)
 			if err != nil {
@@ -110,7 +111,7 @@ func tokenize() *Token {
 			case lookahead(p, '+') == 2:
 			case lookahead(p, '=') == 2:
 			case lookahead(p) == 1:
-				curr.next = NewToken(TokenAdd, p, p+1)
+				curr.next = NewToken(ADD, p, p+1)
 				p += 1
 			}
 			curr = curr.next
@@ -120,7 +121,7 @@ func tokenize() *Token {
 			case lookahead(p, '-') == 2:
 			case lookahead(p, '=') == 2:
 			case lookahead(p) == 1:
-				curr.next = NewToken(TokenSub, p, p+1)
+				curr.next = NewToken(SUB, p, p+1)
 				p += 1
 			}
 			curr = curr.next
@@ -128,7 +129,7 @@ func tokenize() *Token {
 			switch {
 			case lookahead(p, '=') == 2:
 			case lookahead(p) == 1:
-				curr.next = NewToken(TokenMul, p, p+1)
+				curr.next = NewToken(MUL, p, p+1)
 				p += 1
 			}
 			curr = curr.next
@@ -136,27 +137,27 @@ func tokenize() *Token {
 			switch {
 			case lookahead(p, '=') == 2:
 			case lookahead(p) == 1:
-				curr.next = NewToken(TokenDiv, p, p+1)
+				curr.next = NewToken(DIV, p, p+1)
 				p += 1
 			}
 			curr = curr.next
 		case source[p] == '=':
 			switch {
 			case lookahead(p, '=') == 2:
-				curr.next = NewToken(TokenEql, p, p+2)
+				curr.next = NewToken(EQL, p, p+2)
 				p += 2
 			case lookahead(p) == 1:
-				curr.next = NewToken(TokenAsg, p, p+1)
+				curr.next = NewToken(ASG, p, p+1)
 				p += 1
 			}
 			curr = curr.next
 		case source[p] == '!':
 			switch {
 			case lookahead(p, '=') == 2:
-				curr.next = NewToken(TokenNeq, p, p+2)
+				curr.next = NewToken(NEQ, p, p+2)
 				p += 2
 			case lookahead(p) == 1:
-				curr.next = NewToken(TokenNot, p, p+1)
+				curr.next = NewToken(NOT, p, p+1)
 				p += 1
 			}
 			curr = curr.next
@@ -165,10 +166,10 @@ func tokenize() *Token {
 			case lookahead(p, '<', '=') == 3:
 			case lookahead(p, '<') == 2:
 			case lookahead(p, '=') == 2:
-				curr.next = NewToken(TokenLeq, p, p+2)
+				curr.next = NewToken(LEQ, p, p+2)
 				p += 2
 			case lookahead(p) == 1:
-				curr.next = NewToken(TokenLss, p, p+1)
+				curr.next = NewToken(LSS, p, p+1)
 				p += 1
 			}
 			curr = curr.next
@@ -177,23 +178,23 @@ func tokenize() *Token {
 			case lookahead(p, '>', '=') == 3:
 			case lookahead(p, '>') == 2:
 			case lookahead(p, '=') == 2:
-				curr.next = NewToken(TokenGeq, p, p+2)
+				curr.next = NewToken(GEQ, p, p+2)
 				p += 2
 			case lookahead(p) == 1:
-				curr.next = NewToken(TokenGtr, p, p+1)
+				curr.next = NewToken(GTR, p, p+1)
 				p += 1
 			}
 			curr = curr.next
 		case source[p] == '(':
-			curr.next = NewToken(TokenLparen, p, p+1)
+			curr.next = NewToken(LPAREN, p, p+1)
 			curr = curr.next
 			p++
 		case source[p] == ')':
-			curr.next = NewToken(TokenRparen, p, p+1)
+			curr.next = NewToken(RPAREN, p, p+1)
 			curr = curr.next
 			p++
 		case source[p] == ';':
-			curr.next = NewToken(TokenSemi, p, p+1)
+			curr.next = NewToken(SEMI, p, p+1)
 			curr = curr.next
 			p++
 		case isLetter(source[p]):
@@ -201,7 +202,11 @@ func tokenize() *Token {
 			for p < len(source) && (isLetter(source[p]) || isDigit(source[p])) {
 				p++
 			}
-			curr.next = NewToken(TokenIdent, q, p)
+			if kind, ok := keywords[source[q:p]]; ok {
+				curr.next = NewToken(kind, q, p)
+			} else {
+				curr.next = NewToken(IDENT, q, p)
+			}
 			curr = curr.next
 		default:
 			locateError(p)
@@ -209,8 +214,12 @@ func tokenize() *Token {
 			os.Exit(1)
 		}
 	}
-	curr.next = NewToken(TokenEof, p, p)
+	curr.next = NewToken(EOF, p, p)
 	return head.next
+}
+
+var keywords = map[string]TokenKind{
+	"return": RETURN,
 }
 
 func isLetter(c byte) bool {

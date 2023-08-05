@@ -21,6 +21,7 @@ const (
 	NodeLeq                      // lhs <= rhs
 	NodeExprStmt                 // lhs ; (expression statement)
 	NodeAsg                      // lhs = rhs
+	NodeReturn                   // return lhs ; (return statement)
 	NodeVar                      // variable
 	NodeNum                      // number
 )
@@ -104,7 +105,7 @@ func NewVar(variable *Object) *Node {
 func parse(token *Token) *Function {
 	head := Node{}
 	curr := &head
-	for token.kind != TokenEof {
+	for token.kind != EOF {
 		curr.next = stmt(&token, token)
 		curr = curr.next
 	}
@@ -115,8 +116,14 @@ func parse(token *Token) *Function {
 	return program
 }
 
-// stmt -> exprStmt
+// stmt -> "return" expr ";"
+// -->   | exprStmt
 func stmt(rest **Token, token *Token) *Node {
+	if equal(token, "return") {
+		node := NewUnary(NodeReturn, expr(&token, token.next))
+		*rest = skip(token, ";")
+		return node
+	}
 	return exprStmt(rest, token)
 }
 
@@ -236,12 +243,12 @@ func primary(rest **Token, token *Token) (node *Node) {
 		*rest = skip(token, ")")
 		return
 	}
-	if token.kind == TokenNum {
+	if token.kind == NUM {
 		node = NewNumber(token.value)
 		*rest = token.next
 		return
 	}
-	if token.kind == TokenIdent {
+	if token.kind == IDENT {
 		variable := findVar(token)
 		if variable == nil {
 			variable = NewLvar(token.lexeme)

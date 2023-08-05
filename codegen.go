@@ -41,14 +41,20 @@ func gen(program *Function) {
 	for n := program.body; n != nil; n = n.next {
 		genStmt(n)
 	}
+	fmt.Println(".L.return:")
 	fmt.Println("  mov %rbp, %rsp")
 	fmt.Println("  pop %rbp")
 	fmt.Println("  ret")
 }
 
 func genStmt(node *Node) {
-	if node.kind == NodeExprStmt {
+	switch node.kind {
+	case NodeExprStmt:
 		genExpr(node.lhs)
+		return
+	case NodeReturn:
+		genExpr(node.lhs)
+		fmt.Println("  jmp .L.return")
 		return
 	}
 	fmt.Fprintln(os.Stderr, "invalid statement")
