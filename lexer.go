@@ -197,9 +197,12 @@ func tokenize() *Token {
 			curr = curr.next
 			p++
 		case isLetter(source[p]):
-			curr.next = NewToken(TokenIdent, p, p+1)
+			q := p
+			for p < len(source) && (isLetter(source[p]) || isDigit(source[p])) {
+				p++
+			}
+			curr.next = NewToken(TokenIdent, q, p)
 			curr = curr.next
-			p++
 		default:
 			locateError(p)
 			fmt.Fprintln(os.Stderr, "\033[31minvalid token\033[0m")
@@ -211,5 +214,9 @@ func tokenize() *Token {
 }
 
 func isLetter(c byte) bool {
-	return c >= 'a' && c <= 'z'
+	return (c == '_') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+func isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
 }

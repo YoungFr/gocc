@@ -15,15 +15,30 @@ func pop(arg string) {
 	fmt.Printf("  pop %s\n", arg)
 }
 
-func gen(node *Node) {
+// Assign offsets to local variables.
+func assignLvarOffsets(program *Function) {
+	offset := 0
+	for v := program.locals; v != nil; v = v.next {
+		offset += 8
+		v.offset = -offset
+	}
+	program.stackSize = alignTo(offset, 16)
+}
+
+// Round up `n` to the nearest multiple of `align`.
+// For instance, alignTo(5, 8) == 8 && alignTo(11, 8) == 16
+func alignTo(n, align int) int {
+	return (n + align - 1) / align * align
+}
+
+func gen(program *Function) {
+	assignLvarOffsets(program)
 	fmt.Println("  .globl main")
 	fmt.Println("main:")
 	fmt.Println("  push %rbp")
 	fmt.Println("  mov %rsp, %rbp")
-	// 208 == ('z' - 'a' + 1) * 8, it's the stack size for
-	// all possible single-letter 64 bit integer variables.
-	fmt.Println("  sub $208, %rsp")
-	for n := node; n != nil; n = n.next {
+	fmt.Printf("  sub $%d, %%rsp\n", program.stackSize)
+	for n := program.body; n != nil; n = n.next {
 		genStmt(n)
 	}
 	fmt.Println("  mov %rbp, %rsp")
@@ -40,13 +55,14 @@ func genStmt(node *Node) {
 	os.Exit(1)
 }
 
+// Compute the absolute address of a given variable node.
 func genAddr(node *Node) {
 	if node.kind == NodeVar {
-		offset := (node.name[0] - 'a' + 1) * 8
-		fmt.Printf("  lea %d(%%rbp), %%rax\n", -offset)
+		fmt.Printf("  lea %d(%%rbp), %%rax\n", node.variable.offset)
 		return
 	}
 	fmt.Fprintln(os.Stderr, "not a lvalue")
+	os.Exit(1)
 }
 
 func genExpr(node *Node) {

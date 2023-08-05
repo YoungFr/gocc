@@ -25,13 +25,50 @@ const (
 	NodeNum                      // number
 )
 
+// Object Local variable
+type Object struct {
+	next   *Object // Next object
+	name   string  // Variable name
+	offset int     // Offset from RBP
+}
+
+// All local variable instances created during
+// parsing are accumulated to this list.
+var locals *Object
+
+// NewLvar Create a new local variable instance.
+func NewLvar(name string) *Object {
+	variable := &Object{
+		next: locals,
+		name: name,
+	}
+	locals = variable
+	return variable
+}
+
+// Find a local variable by name.
+func findVar(token *Token) *Object {
+	for v := locals; v != nil; v = v.next {
+		if v.name == token.lexeme {
+			return v
+		}
+	}
+	return nil
+}
+
+type Function struct {
+	body      *Node
+	locals    *Object
+	stackSize int
+}
+
 type Node struct {
-	kind  NodeKind // Node kind
-	next  *Node    // Next node
-	lhs   *Node    // Left-hand side
-	rhs   *Node    // Right-hand side
-	name  string   // If kind == NodeVar, variable's name
-	value int      // If kind == NodeNum, its value
+	kind     NodeKind // Node kind
+	next     *Node    // Next node
+	lhs      *Node    // Left-hand side
+	rhs      *Node    // Right-hand side
+	variable *Object  // Used if kind == NodeVar, its struct representation
+	value    int      // Used if kind == NodeNum, its value
 }
 
 func NewNode(kind NodeKind) *Node {
@@ -57,20 +94,25 @@ func NewUnary(kind NodeKind, expr *Node) *Node {
 	return node
 }
 
-func NewVar(name string) *Node {
+func NewVar(variable *Object) *Node {
 	node := NewNode(NodeVar)
-	node.name = name
+	node.variable = variable
 	return node
 }
 
-func parse(token *Token) *Node {
+// program -> stmt*
+func parse(token *Token) *Function {
 	head := Node{}
 	curr := &head
 	for token.kind != TokenEof {
 		curr.next = stmt(&token, token)
 		curr = curr.next
 	}
-	return head.next
+	program := &Function{
+		body:   head.next,
+		locals: locals,
+	}
+	return program
 }
 
 // stmt -> exprStmt
@@ -200,8 +242,12 @@ func primary(rest **Token, token *Token) (node *Node) {
 		return
 	}
 	if token.kind == TokenIdent {
-		node = NewVar(token.lexeme)
+		variable := findVar(token)
+		if variable == nil {
+			variable = NewLvar(token.lexeme)
+		}
 		*rest = token.next
+		node = NewVar(variable)
 		return
 	}
 	locateError(token.begin)

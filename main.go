@@ -20,6 +20,6 @@ func main() {
 
 	source = os.Args[1]
 	token := tokenize()
-	node := parse(token)
-	gen(node)
+	program := parse(token)
+	gen(program)
 }

@@ -54,4 +54,7 @@ assert 6 'a=b=3; a+b;'
 assert 0 'a=1; b=1; c=1; a-(b-c)-a;'
 assert 9 'a=b=1; c=d=1+1; a*2+b+3*d;'
 
+assert 3 'foo=3; foo;'
+assert 8 'foo123=3; bar=5; foo123+bar;'
+
 echo OK
