@@ -7,9 +7,7 @@ import (
 	"unicode"
 )
 
-// 词法分析 Tokenizer
-
-// token -> 词法单元
+// Tokenizer
 
 type TokenKind int
 
@@ -33,12 +31,12 @@ const (
 )
 
 type Token struct {
-	kind   TokenKind // 词法单元的类型
-	next   *Token    // 下一个词法单元
-	value  int       // 类型为 TokenNum 时词素代表的值
-	begin  int       // 词素的起始索引
-	length int       // 词素的长度
-	lexeme string    // 词素
+	kind   TokenKind // Token kind
+	next   *Token    // Next token
+	value  int       // If kind == TokenNum, its value
+	begin  int       // Starting index of lexeme
+	length int       // Length of lexeme
+	lexeme string    // A substring in the source that matches the pattern for a token
 }
 
 func equal(token *Token, lexeme string) bool {
@@ -70,18 +68,19 @@ func lookahead(p int, expected ...byte) int {
 	if p+n >= len(source) {
 		return -1
 	}
-	res := 1
+	toklen := 1
 	for i := 1; i <= n; i++ {
 		if source[p+i] == expected[i-1] {
-			res++
+			toklen++
 		} else {
-			return res
+			return toklen
 		}
 	}
-	return res
+	return toklen
 }
 
-// 将所有词法单元组织成一个单链表并返回指向第一个词法单元的指针
+// Create a tokens list
+// Return a pointer to the first token
 func tokenize() *Token {
 	head := Token{}
 	curr := &head
@@ -107,11 +106,8 @@ func tokenize() *Token {
 		case source[p] == '+':
 			switch {
 			case lookahead(p, '+') == 2:
-				// ++
 			case lookahead(p, '=') == 2:
-				// +=
 			case lookahead(p) == 1:
-				// +
 				curr.next = NewToken(TokenAdd, p, p+1)
 				p += 1
 			}
@@ -119,13 +115,9 @@ func tokenize() *Token {
 		case source[p] == '-':
 			switch {
 			case lookahead(p, '>') == 2:
-				// ->
 			case lookahead(p, '-') == 2:
-				// --
 			case lookahead(p, '=') == 2:
-				// -=
 			case lookahead(p) == 1:
-				// -
 				curr.next = NewToken(TokenSub, p, p+1)
 				p += 1
 			}
@@ -133,9 +125,7 @@ func tokenize() *Token {
 		case source[p] == '*':
 			switch {
 			case lookahead(p, '=') == 2:
-				// *=
 			case lookahead(p) == 1:
-				// *
 				curr.next = NewToken(TokenMul, p, p+1)
 				p += 1
 			}
@@ -143,9 +133,7 @@ func tokenize() *Token {
 		case source[p] == '/':
 			switch {
 			case lookahead(p, '=') == 2:
-				// /=
 			case lookahead(p) == 1:
-				// /
 				curr.next = NewToken(TokenDiv, p, p+1)
 				p += 1
 			}
@@ -153,11 +141,9 @@ func tokenize() *Token {
 		case source[p] == '=':
 			switch {
 			case lookahead(p, '=') == 2:
-				// ==
 				curr.next = NewToken(TokenEql, p, p+2)
 				p += 2
 			case lookahead(p) == 1:
-				// =
 				curr.next = NewToken(TokenAsg, p, p+1)
 				p += 1
 			}
@@ -165,11 +151,9 @@ func tokenize() *Token {
 		case source[p] == '!':
 			switch {
 			case lookahead(p, '=') == 2:
-				// !=
 				curr.next = NewToken(TokenNeq, p, p+2)
 				p += 2
 			case lookahead(p) == 1:
-				// !
 				curr.next = NewToken(TokenNot, p, p+1)
 				p += 1
 			}
@@ -177,15 +161,11 @@ func tokenize() *Token {
 		case source[p] == '<':
 			switch {
 			case lookahead(p, '<', '=') == 3:
-				// <<=
 			case lookahead(p, '<') == 2:
-				// <<
 			case lookahead(p, '=') == 2:
-				// <=
 				curr.next = NewToken(TokenLeq, p, p+2)
 				p += 2
 			case lookahead(p) == 1:
-				// <
 				curr.next = NewToken(TokenLss, p, p+1)
 				p += 1
 			}
@@ -193,15 +173,11 @@ func tokenize() *Token {
 		case source[p] == '>':
 			switch {
 			case lookahead(p, '>', '=') == 3:
-				// >>=
 			case lookahead(p, '>') == 2:
-				// >>
 			case lookahead(p, '=') == 2:
-				// >=
 				curr.next = NewToken(TokenGeq, p, p+2)
 				p += 2
 			case lookahead(p) == 1:
-				// >
 				curr.next = NewToken(TokenGtr, p, p+1)
 				p += 1
 			}

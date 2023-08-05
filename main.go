@@ -5,13 +5,11 @@ import (
 	"os"
 )
 
-// 定位错误所在位置
 func locateError(offset int) {
 	fmt.Fprintln(os.Stderr, source)
 	fmt.Fprintf(os.Stderr, "%*s\033[31m^ \033[0m", offset, "")
 }
 
-// 输入字符串
 var source string
 
 func main() {

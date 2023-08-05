@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// 语法分析 Parser
+// Parser
 
 type NodeKind int
 
@@ -23,10 +23,10 @@ const (
 )
 
 type Node struct {
-	kind  NodeKind
-	lhs   *Node
-	rhs   *Node
-	value int // 当 Node 的类型是 NodeNum 时整数的值
+	kind  NodeKind // Node kind
+	lhs   *Node    // Left-hand side
+	rhs   *Node    // Right-hand side
+	value int      // If kind == NodeNum, its value
 }
 
 func NewNode(kind NodeKind) *Node {

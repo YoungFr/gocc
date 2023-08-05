@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-// 代码生成 Code generator
+// Code generator
 
 func push() {
 	fmt.Println("  push %rax")
