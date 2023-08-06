@@ -3,11 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
-func locateError(offset int) {
+func locate(begin int, length int) {
 	fmt.Fprintln(os.Stderr, source)
-	fmt.Fprintf(os.Stderr, "%*s\033[31m^ \033[0m", offset, "")
+	if length == 0 {
+		length++
+	}
+	fmt.Fprintf(os.Stderr, "%*s\033[31m%s \033[0m", begin, "", strings.Repeat("^", length))
 }
 
 var source string

@@ -79,7 +79,7 @@ func genStmt(node *Node) {
 	case NodeIf:
 		c := counter()
 		genExpr(node.condition)
-		fmt.Println("  cmp $0, %rax")
+		fmt.Printf("  cmp $0, %%rax\n")
 		fmt.Printf("  je  .L.else.%d\n", c)
 		genStmt(node.thenBranch)
 		fmt.Printf("  jmp .L.end.%d\n", c)
@@ -97,7 +97,7 @@ func genStmt(node *Node) {
 		fmt.Printf(".L.begin.%d:\n", c)
 		if node.condition != nil {
 			genExpr(node.condition)
-			fmt.Println("  cmp $0, %rax")
+			fmt.Printf("  cmp $0, %%rax\n")
 			fmt.Printf("  je  .L.end.%d\n", c)
 		}
 		genStmt(node.thenBranch)
@@ -108,8 +108,6 @@ func genStmt(node *Node) {
 		fmt.Printf(".L.end.%d:\n", c)
 		return
 	}
-	fmt.Fprintln(os.Stderr, "invalid statement")
-	os.Exit(1)
 }
 
 // Compute the absolute address of a given variable node.
@@ -118,7 +116,8 @@ func genAddr(node *Node) {
 		fmt.Printf("  lea %d(%%rbp), %%rax\n", node.variable.offset)
 		return
 	}
-	fmt.Fprintln(os.Stderr, "not a lvalue")
+	locate(node.token.begin, node.token.length)
+	fmt.Fprintln(os.Stderr, "\033[31mnot assignable\033[0m")
 	os.Exit(1)
 }
 

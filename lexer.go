@@ -54,7 +54,7 @@ func equal(token *Token, lexeme string) bool {
 
 func skip(token *Token, lexeme string) *Token {
 	if !equal(token, lexeme) {
-		locateError(token.begin)
+		locate(token.begin, token.length)
 		fmt.Fprintf(os.Stderr, "\033[31mexpected \"%s\"\n\033[0m", lexeme)
 		os.Exit(1)
 	}
@@ -107,7 +107,7 @@ func tokenize() *Token {
 			curr = curr.next
 			value, err := strconv.Atoi(curr.lexeme)
 			if err != nil {
-				locateError((q + p) / 2)
+				locate(q, p-q)
 				fmt.Fprintf(os.Stderr, "\033[31m%s\n\033[0m", err.Error()[len("strconv.Atoi: "):])
 				os.Exit(1)
 			}
@@ -223,7 +223,7 @@ func tokenize() *Token {
 			}
 			curr = curr.next
 		default:
-			locateError(p)
+			locate(p, 1)
 			fmt.Fprintln(os.Stderr, "\033[31minvalid token\033[0m")
 			os.Exit(1)
 		}

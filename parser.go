@@ -73,6 +73,9 @@ type Node struct {
 	lhs  *Node    // Left-hand side
 	rhs  *Node    // Right-hand side
 
+	// Representative token
+	token *Token
+
 	// Used if kind == NodeIf | NodeFor
 	condition  *Node
 	thenBranch *Node
@@ -96,31 +99,34 @@ type Node struct {
 	value int
 }
 
-func NewNode(kind NodeKind) *Node {
-	return &Node{kind: kind}
+func NewNode(kind NodeKind, token *Token) *Node {
+	return &Node{
+		kind:  kind,
+		token: token,
+	}
 }
 
-func NewBinary(kind NodeKind, lhs *Node, rhs *Node) *Node {
-	node := NewNode(kind)
+func NewBinary(kind NodeKind, lhs *Node, rhs *Node, token *Token) *Node {
+	node := NewNode(kind, token)
 	node.lhs = lhs
 	node.rhs = rhs
 	return node
 }
 
-func NewNumber(value int) *Node {
-	node := NewNode(NodeNum)
+func NewNumber(value int, token *Token) *Node {
+	node := NewNode(NodeNum, token)
 	node.value = value
 	return node
 }
 
-func NewUnary(kind NodeKind, expr *Node) *Node {
-	node := NewNode(kind)
+func NewUnary(kind NodeKind, expr *Node, token *Token) *Node {
+	node := NewNode(kind, token)
 	node.lhs = expr
 	return node
 }
 
-func NewVar(variable *Object) *Node {
-	node := NewNode(NodeVar)
+func NewVar(variable *Object, token *Token) *Node {
+	node := NewNode(NodeVar, token)
 	node.variable = variable
 	return node
 }
@@ -148,7 +154,7 @@ func parse(token *Token) *Function {
 // -->   | exprStmt
 func stmt(rest **Token, token *Token) *Node {
 	if equal(token, "return") {
-		node := NewUnary(NodeReturn, expr(&token, token.next))
+		node := NewUnary(NodeReturn, expr(&token, token.next), token)
 		*rest = skip(token, ";")
 		return node
 	}
@@ -156,7 +162,7 @@ func stmt(rest **Token, token *Token) *Node {
 		return block(rest, token.next)
 	}
 	if equal(token, "if") {
-		node := NewNode(NodeIf)
+		node := NewNode(NodeIf, token)
 		token = skip(token.next, "(")
 		node.condition = expr(&token, token)
 		token = skip(token, ")")
@@ -168,7 +174,7 @@ func stmt(rest **Token, token *Token) *Node {
 		return node
 	}
 	if equal(token, "for") {
-		node := NewNode(NodeFor)
+		node := NewNode(NodeFor, token)
 		token = skip(token.next, "(")
 		node.initializer = exprStmt(&token, token)
 		if !equal(token, ";") {
@@ -184,7 +190,7 @@ func stmt(rest **Token, token *Token) *Node {
 		return node
 	}
 	if equal(token, "while") {
-		node := NewNode(NodeFor)
+		node := NewNode(NodeFor, token)
 		token = skip(token.next, "(")
 		node.condition = expr(&token, token)
 		token = skip(token, ")")
@@ -197,13 +203,14 @@ func stmt(rest **Token, token *Token) *Node {
 
 // block -> stmt* "}"
 func block(rest **Token, token *Token) *Node {
+	node := NewNode(NodeBlock, token)
+	// statements' linked list
 	head := Node{}
 	curr := &head
 	for token.kind != EOF && !equal(token, "}") {
 		curr.next = stmt(&token, token)
 		curr = curr.next
 	}
-	node := NewNode(NodeBlock)
 	node.body = head.next
 	*rest = skip(token, "}")
 	return node
@@ -213,9 +220,9 @@ func block(rest **Token, token *Token) *Node {
 func exprStmt(rest **Token, token *Token) *Node {
 	if equal(token, ";") {
 		*rest = token.next
-		return NewNode(NodeBlock)
+		return NewNode(NodeBlock, token)
 	}
-	node := NewUnary(NodeExprStmt, expr(&token, token))
+	node := NewUnary(NodeExprStmt, expr(&token, token), token)
 	*rest = skip(token, ";")
 	return node
 }
@@ -229,7 +236,7 @@ func expr(rest **Token, token *Token) *Node {
 func assign(rest **Token, token *Token) (node *Node) {
 	node = equality(&token, token)
 	if equal(token, "=") {
-		node = NewBinary(NodeAsg, node, assign(&token, token.next))
+		node = NewBinary(NodeAsg, node, assign(&token, token.next), token)
 	}
 	*rest = token
 	return
@@ -239,12 +246,13 @@ func assign(rest **Token, token *Token) (node *Node) {
 func equality(rest **Token, token *Token) (node *Node) {
 	node = relational(&token, token)
 	for {
+		start := token
 		if equal(token, "==") {
-			node = NewBinary(NodeEql, node, relational(&token, token.next))
+			node = NewBinary(NodeEql, node, relational(&token, token.next), start)
 			continue
 		}
 		if equal(token, "!=") {
-			node = NewBinary(NodeNeq, node, relational(&token, token.next))
+			node = NewBinary(NodeNeq, node, relational(&token, token.next), start)
 			continue
 		}
 		*rest = token
@@ -256,20 +264,21 @@ func equality(rest **Token, token *Token) (node *Node) {
 func relational(rest **Token, token *Token) (node *Node) {
 	node = addsub(&token, token)
 	for {
+		start := token
 		if equal(token, "<") {
-			node = NewBinary(NodeLss, node, addsub(&token, token.next))
+			node = NewBinary(NodeLss, node, addsub(&token, token.next), start)
 			continue
 		}
 		if equal(token, "<=") {
-			node = NewBinary(NodeLeq, node, addsub(&token, token.next))
+			node = NewBinary(NodeLeq, node, addsub(&token, token.next), start)
 			continue
 		}
 		if equal(token, ">") {
-			node = NewBinary(NodeLss, addsub(&token, token.next), node)
+			node = NewBinary(NodeLss, addsub(&token, token.next), node, start)
 			continue
 		}
 		if equal(token, ">=") {
-			node = NewBinary(NodeLeq, addsub(&token, token.next), node)
+			node = NewBinary(NodeLeq, addsub(&token, token.next), node, start)
 			continue
 		}
 		*rest = token
@@ -281,12 +290,13 @@ func relational(rest **Token, token *Token) (node *Node) {
 func addsub(rest **Token, token *Token) (node *Node) {
 	node = muldiv(&token, token)
 	for {
+		start := token
 		if equal(token, "+") {
-			node = NewBinary(NodeAdd, node, muldiv(&token, token.next))
+			node = NewBinary(NodeAdd, node, muldiv(&token, token.next), start)
 			continue
 		}
 		if equal(token, "-") {
-			node = NewBinary(NodeSub, node, muldiv(&token, token.next))
+			node = NewBinary(NodeSub, node, muldiv(&token, token.next), start)
 			continue
 		}
 		*rest = token
@@ -298,12 +308,13 @@ func addsub(rest **Token, token *Token) (node *Node) {
 func muldiv(rest **Token, token *Token) (node *Node) {
 	node = unary(&token, token)
 	for {
+		start := token
 		if equal(token, "*") {
-			node = NewBinary(NodeMul, node, unary(&token, token.next))
+			node = NewBinary(NodeMul, node, unary(&token, token.next), start)
 			continue
 		}
 		if equal(token, "/") {
-			node = NewBinary(NodeDiv, node, unary(&token, token.next))
+			node = NewBinary(NodeDiv, node, unary(&token, token.next), start)
 			continue
 		}
 		*rest = token
@@ -318,7 +329,7 @@ func unary(rest **Token, token *Token) *Node {
 		return unary(rest, token.next)
 	}
 	if equal(token, "-") {
-		return NewUnary(NodeNeg, unary(rest, token.next))
+		return NewUnary(NodeNeg, unary(rest, token.next), token)
 	}
 	return primary(rest, token)
 }
@@ -333,7 +344,7 @@ func primary(rest **Token, token *Token) (node *Node) {
 		return
 	}
 	if token.kind == NUM {
-		node = NewNumber(token.value)
+		node = NewNumber(token.value, token)
 		*rest = token.next
 		return
 	}
@@ -343,10 +354,10 @@ func primary(rest **Token, token *Token) (node *Node) {
 			variable = NewLvar(token.lexeme)
 		}
 		*rest = token.next
-		node = NewVar(variable)
+		node = NewVar(variable, token)
 		return
 	}
-	locateError(token.begin)
+	locate(token.begin, token.length)
 	fmt.Fprintln(os.Stderr, "\033[31mexpected an expression\033[0m")
 	os.Exit(1)
 	return
