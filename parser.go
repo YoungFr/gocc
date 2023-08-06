@@ -37,13 +37,13 @@ const (
 	NodeNeg                      // - lhs
 	NodeAddr                     // & lhs
 	NodeDeref                    // * lhs
+	NodeVar                      // variable
+	NodeNum                      // number
 	NodeExprStmt                 // expression statement
 	NodeReturn                   // return statement
 	NodeBlock                    // block statement
 	NodeIf                       // if statement
 	NodeFor                      // for or while statement
-	NodeVar                      // variable
-	NodeNum                      // number
 )
 
 // Object represents a local variable.
@@ -54,11 +54,11 @@ type Object struct {
 }
 
 // All local variable instances created during
-// parsing are accumulated to this list.
+// parsing are accumulated to this linked list.
 var locals *Object
 
-// NewLvar creates a new local variable instance
-// and inserts it into the head of the `locals` list.
+// NewLvar creates a new local variable instance and
+// inserts it into the head of the `locals` linked list.
 func NewLvar(name string) *Object {
 	variable := &Object{
 		next: locals,
@@ -86,9 +86,11 @@ type Function struct {
 
 type Node struct {
 	kind NodeKind // Node kind
-	next *Node    // Next node
 	lhs  *Node    // Left-hand side
 	rhs  *Node    // Right-hand side
+
+	// int, pointer to int, ...
+	tp *Type
 
 	// Representative token
 	token *Token
@@ -107,6 +109,7 @@ type Node struct {
 	// Used if kind == NodeBlock
 	// The list of statements within the block
 	body *Node
+	next *Node
 
 	// Used if kind == NodeVar
 	// Variable's struct representation
@@ -136,6 +139,61 @@ func NewNumber(value int, token *Token) *Node {
 	return node
 }
 
+// NewAdd In C, `+` operator is overloaded to perform the pointer arithmetic.
+// If p is a pointer, p+n adds not n but sizeof(*p)*n to the value of p,
+// so that p+n points to the location n elements (not bytes) ahead of p.
+// In other words, we need to scale an integer value before adding to a
+// pointer value.
+func NewAdd(lhs *Node, rhs *Node, token *Token) *Node {
+	addtype(lhs)
+	addtype(rhs)
+	// num + num
+	if isint(lhs.tp) && isint(rhs.tp) {
+		return NewBinary(NodeAdd, lhs, rhs, token)
+	}
+	// ptr + ptr
+	if lhs.tp.base != nil && rhs.tp.base != nil {
+		locate(token.begin, token.length)
+		fmt.Fprintln(os.Stderr, "\033[31minvalid opreands\033[0m")
+		os.Exit(1)
+	}
+	// num + ptr -> ptr + num
+	if lhs.tp.base == nil && rhs.tp.base != nil {
+		lhs, rhs = rhs, lhs
+	}
+	// ptr + num
+	rhs = NewBinary(NodeMul, rhs, NewNumber(8, token), token)
+	return NewBinary(NodeAdd, lhs, rhs, token)
+}
+
+// NewSub `-` operator is also overloaded to perform the pointer arithmetic.
+func NewSub(lhs *Node, rhs *Node, token *Token) *Node {
+	addtype(lhs)
+	addtype(rhs)
+	// num - num
+	if isint(lhs.tp) && isint(rhs.tp) {
+		return NewBinary(NodeSub, lhs, rhs, token)
+	}
+	// ptr - num
+	if lhs.tp.base != nil && isint(rhs.tp) {
+		rhs = NewBinary(NodeMul, rhs, NewNumber(8, token), token)
+		addtype(rhs)
+		node := NewBinary(NodeSub, lhs, rhs, token)
+		node.tp = lhs.tp
+		return node
+	}
+	// num - ptr
+	if isint(lhs.tp) && rhs.tp.base != nil {
+		locate(token.begin, token.length)
+		fmt.Fprintln(os.Stderr, "\033[31minvalid opreands\033[0m")
+		os.Exit(1)
+	}
+	// ptr - ptr
+	node := NewBinary(NodeSub, lhs, rhs, token)
+	node.tp = tpint
+	return NewBinary(NodeDiv, node, NewNumber(8, token), token)
+}
+
 func NewUnary(kind NodeKind, expr *Node, token *Token) *Node {
 	node := NewNode(kind, token)
 	node.lhs = expr
@@ -155,6 +213,7 @@ func parse(token *Token) *Function {
 	for token.kind != EOF {
 		curr.next = stmt(&token, token)
 		curr = curr.next
+		addtype(curr)
 	}
 	program := &Function{
 		body:   head.next,
@@ -309,11 +368,11 @@ func addsub(rest **Token, token *Token) (node *Node) {
 	for {
 		start := token
 		if equal(token, "+") {
-			node = NewBinary(NodeAdd, node, muldiv(&token, token.next), start)
+			node = NewAdd(node, muldiv(&token, token.next), start)
 			continue
 		}
 		if equal(token, "-") {
-			node = NewBinary(NodeSub, node, muldiv(&token, token.next), start)
+			node = NewSub(node, muldiv(&token, token.next), start)
 			continue
 		}
 		*rest = token
