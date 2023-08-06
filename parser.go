@@ -24,6 +24,7 @@ const (
 	NodeReturn                   // return statement
 	NodeBlock                    // block statement
 	NodeIf                       // if statement
+	NodeFor                      // for or while statement
 	NodeVar                      // variable
 	NodeNum                      // number
 )
@@ -72,10 +73,16 @@ type Node struct {
 	lhs  *Node    // Left-hand side
 	rhs  *Node    // Right-hand side
 
-	// Used if kind == NodeIf
+	// Used if kind == NodeIf | NodeFor
 	condition  *Node
 	thenBranch *Node
+
+	// Used if kind == NodeIf
 	elseBranch *Node
+
+	// Used if kind == NodeFor
+	initializer *Node
+	increment   *Node
 
 	// Used if kind == NodeBlock
 	// The list of statements within the block
@@ -136,6 +143,8 @@ func parse(token *Token) *Function {
 // stmt -> "return" expr ";"
 // -->   | "{" block
 // -->   | "if" "(" expr ")" stmt ( "else" stmt )?
+// -->   | "for" "(" exprStmt expr? ";" expr? ")" stmt
+// -->   | "while" "(" expr ")" stmt
 // -->   | exprStmt
 func stmt(rest **Token, token *Token) *Node {
 	if equal(token, "return") {
@@ -155,6 +164,31 @@ func stmt(rest **Token, token *Token) *Node {
 		if equal(token, "else") {
 			node.elseBranch = stmt(&token, token.next)
 		}
+		*rest = token
+		return node
+	}
+	if equal(token, "for") {
+		node := NewNode(NodeFor)
+		token = skip(token.next, "(")
+		node.initializer = exprStmt(&token, token)
+		if !equal(token, ";") {
+			node.condition = expr(&token, token)
+		}
+		token = skip(token, ";")
+		if !equal(token, ")") {
+			node.increment = expr(&token, token)
+		}
+		token = skip(token, ")")
+		node.thenBranch = stmt(&token, token)
+		*rest = token
+		return node
+	}
+	if equal(token, "while") {
+		node := NewNode(NodeFor)
+		token = skip(token.next, "(")
+		node.condition = expr(&token, token)
+		token = skip(token, ")")
+		node.thenBranch = stmt(&token, token)
 		*rest = token
 		return node
 	}

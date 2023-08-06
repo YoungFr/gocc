@@ -120,4 +120,14 @@ assert 4 '{ if (0) { 1; 2; return 3; } else { return 4; } }'
 assert 3 '{ if (1) { 1; 2; return 3; } else { return 4; } }'
 assert 3 'if(0) return 0; if (0) {return 1;} if (0) {return 2;} else return 3;'
 
+assert 55 '{ i=0; j=0; for (i=0; i<=10; i=i+1) j=i+j; return j; }'
+assert 3 '{ for (;;) {return 3;} return 5; }'
+assert 5 'i = 0; for (; i < 5; i = i+1) {;} return 5;'
+assert 6 ' ; for (a = (1+3)*3; ; a = a-1) if (a==3) return 2*a;'
+assert 6 'for(a=5;;) {if (a==1) return 3*(a+1); else a = a-1;}'
+
+assert 5 'i = 0; while (i < 10) {if (i==5) return i; i = i+1;}'
+assert 9 '{ i=0; while (i<9) i=i+1; return i; }'
+assert 2 'if (1) {i = 5; for (;;i = i-1) if (i==2) return i;}'
+
 echo OK

@@ -89,6 +89,24 @@ func genStmt(node *Node) {
 		}
 		fmt.Printf(".L.end.%d:\n", c)
 		return
+	case NodeFor:
+		c := counter()
+		if node.initializer != nil {
+			genStmt(node.initializer)
+		}
+		fmt.Printf(".L.begin.%d:\n", c)
+		if node.condition != nil {
+			genExpr(node.condition)
+			fmt.Println("  cmp $0, %rax")
+			fmt.Printf("  je  .L.end.%d\n", c)
+		}
+		genStmt(node.thenBranch)
+		if node.increment != nil {
+			genExpr(node.increment)
+		}
+		fmt.Printf("  jmp .L.begin.%d\n", c)
+		fmt.Printf(".L.end.%d:\n", c)
+		return
 	}
 	fmt.Fprintln(os.Stderr, "invalid statement")
 	os.Exit(1)

@@ -33,6 +33,8 @@ const (
 	RETURN                    // return
 	IF                        // if
 	ELSE                      // else
+	FOR                       // for
+	WHILE                     // while
 	NUM                       // number
 	EOF                       // EOF
 )
@@ -234,6 +236,8 @@ var keywords = map[string]TokenKind{
 	"return": RETURN,
 	"if":     IF,
 	"else":   ELSE,
+	"for":    FOR,
+	"while":  WHILE,
 }
 
 func isLetter(c byte) bool {
