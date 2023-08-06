@@ -110,14 +110,18 @@ func genStmt(node *Node) {
 	}
 }
 
-// Compute the absolute address of a given variable node.
+// Compute the absolute address of a given node.
 func genAddr(node *Node) {
-	if node.kind == NodeVar {
+	switch node.kind {
+	case NodeVar:
 		fmt.Printf("  lea %d(%%rbp), %%rax\n", node.variable.offset)
+		return
+	case NodeDeref:
+		genExpr(node.lhs)
 		return
 	}
 	locate(node.token.begin, node.token.length)
-	fmt.Fprintln(os.Stderr, "\033[31mnot assignable\033[0m")
+	fmt.Fprintln(os.Stderr, "\033[31mnot addressable\033[0m")
 	os.Exit(1)
 }
 
@@ -129,6 +133,13 @@ func genExpr(node *Node) {
 	case NodeNeg:
 		genExpr(node.lhs)
 		fmt.Println("  neg %rax")
+		return
+	case NodeDeref:
+		genExpr(node.lhs)
+		fmt.Println("  mov (%rax), %rax")
+		return
+	case NodeAddr:
+		genAddr(node.lhs)
 		return
 	case NodeVar:
 		genAddr(node)

@@ -24,6 +24,7 @@ const (
 	LEQ                       // <=
 	GTR                       // >
 	GEQ                       // >=
+	AND                       // &
 	LPAREN                    // (
 	RPAREN                    // )
 	LBRACE                    // {
@@ -188,6 +189,15 @@ func tokenize() *Token {
 				p += 2
 			case lookahead(p) == 1:
 				curr.next = NewToken(GTR, p, p+1)
+				p += 1
+			}
+			curr = curr.next
+		case source[p] == '&':
+			switch {
+			case lookahead(p, '&') == 2:
+			case lookahead(p, '=') == 2:
+			case lookahead(p) == 1:
+				curr.next = NewToken(AND, p, p+1)
 				p += 1
 			}
 			curr = curr.next
