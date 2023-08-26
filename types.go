@@ -1,5 +1,10 @@
 package main
 
+import (
+	"fmt"
+	"os"
+)
+
 type TypeKind int
 
 const (
@@ -10,6 +15,7 @@ const (
 type Type struct {
 	kind TypeKind // Type kind
 	base *Type    // Used if kind == TPPTR
+	name *Token   // Declaration
 }
 
 func isint(t *Type) bool {
@@ -43,18 +49,21 @@ func addtype(node *Node) {
 	case NodeAdd, NodeSub, NodeMul, NodeDiv, NodeNeg, NodeAsg:
 		node.tp = node.lhs.tp
 		return
-	case NodeEql, NodeNeq, NodeLss, NodeLeq, NodeVar, NodeNum:
+	case NodeEql, NodeNeq, NodeLss, NodeLeq, NodeNum:
 		node.tp = tpint
 		return
+	case NodeVar:
+		node.tp = node.variable.tp
 	case NodeAddr:
 		node.tp = ptrto(node.lhs.tp)
 		return
 	case NodeDeref:
-		if node.lhs.tp.kind == TPPTR {
-			node.tp = node.lhs.tp.base
-		} else {
-			node.tp = tpint
+		if node.lhs.tp.kind != TPPTR {
+			locate(node.token.begin, node.token.length)
+			fmt.Fprintln(os.Stderr, "\033[31minvalid pointer dereference\033[0m")
+			os.Exit(1)
 		}
+		node.tp = node.lhs.tp.base
 		return
 	}
 }

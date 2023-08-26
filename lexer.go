@@ -30,12 +30,14 @@ const (
 	LBRACE                    // {
 	RBRACE                    // }
 	SEMI                      // ;
+	COMMA                     // ,
 	IDENT                     // identifier
 	RETURN                    // return
 	IF                        // if
 	ELSE                      // else
 	FOR                       // for
 	WHILE                     // while
+	INT                       // int
 	NUM                       // number
 	EOF                       // EOF
 )
@@ -47,19 +49,6 @@ type Token struct {
 	begin  int       // Starting index of lexeme
 	length int       // Length of lexeme
 	lexeme string    // A substring in the source that matches the pattern for a token
-}
-
-func equal(token *Token, lexeme string) bool {
-	return token.lexeme == lexeme
-}
-
-func skip(token *Token, lexeme string) *Token {
-	if !equal(token, lexeme) {
-		locate(token.begin, token.length)
-		fmt.Fprintf(os.Stderr, "\033[31mexpected \"%s\"\n\033[0m", lexeme)
-		os.Exit(1)
-	}
-	return token.next
 }
 
 func NewToken(kind TokenKind, begin int, end int) *Token {
@@ -221,6 +210,10 @@ func tokenize() *Token {
 			curr.next = NewToken(SEMI, p, p+1)
 			curr = curr.next
 			p++
+		case source[p] == ',':
+			curr.next = NewToken(COMMA, p, p+1)
+			curr = curr.next
+			p++
 		case isLetter(source[p]):
 			q := p
 			for p < len(source) && (isLetter(source[p]) || isDigit(source[p])) {
@@ -248,6 +241,7 @@ var keywords = map[string]TokenKind{
 	"else":   ELSE,
 	"for":    FOR,
 	"while":  WHILE,
+	"int":    INT,
 }
 
 func isLetter(c byte) bool {

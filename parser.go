@@ -48,8 +48,9 @@ const (
 
 // Object represents a local variable.
 type Object struct {
-	next   *Object // Next object
-	name   string  // Variable name
+	next   *Object // Next variable
+	name   string  // Variable's name
+	tp     *Type   // Variable's type
 	offset int     // Offset from RBP
 }
 
@@ -59,10 +60,11 @@ var locals *Object
 
 // NewLvar creates a new local variable instance and
 // inserts it into the head of the `locals` linked list.
-func NewLvar(name string) *Object {
+func NewLvar(name string, tp *Type) *Object {
 	variable := &Object{
 		next: locals,
 		name: name,
+		tp:   tp,
 	}
 	locals = variable
 	return variable
@@ -76,12 +78,6 @@ func findVar(token *Token) *Object {
 		}
 	}
 	return nil
-}
-
-type Function struct {
-	body      *Node
-	locals    *Object
-	stackSize int
 }
 
 type Node struct {
@@ -206,6 +202,12 @@ func NewVar(variable *Object, token *Token) *Node {
 	return node
 }
 
+type Function struct {
+	body      *Node
+	locals    *Object
+	stackSize int
+}
+
 // program -> stmt* EOF
 func parse(token *Token) *Function {
 	head := Node{}
@@ -222,12 +224,26 @@ func parse(token *Token) *Function {
 	return program
 }
 
+func equal(token *Token, lexeme string) bool {
+	return token.lexeme == lexeme
+}
+
+func skip(token *Token, lexeme string) *Token {
+	if !equal(token, lexeme) {
+		locate(token.begin, token.length)
+		fmt.Fprintf(os.Stderr, "\033[31mexpected \"%s\"\n\033[0m", lexeme)
+		os.Exit(1)
+	}
+	return token.next
+}
+
 // stmt -> "return" expr ";"
 // -->   | "{" block
 // -->   | "if" "(" expr ")" stmt ( "else" stmt )?
 // -->   | "for" "(" exprStmt expr? ";" expr? ")" stmt
 // -->   | "while" "(" expr ")" stmt
 // -->   | exprStmt
+// -->   | declaration
 func stmt(rest **Token, token *Token) *Node {
 	if equal(token, "return") {
 		node := NewUnary(NodeReturn, expr(&token, token.next), token)
@@ -274,7 +290,94 @@ func stmt(rest **Token, token *Token) *Node {
 		*rest = token
 		return node
 	}
+	if equal(token, "int") {
+		return declaration(rest, token)
+	}
 	return exprStmt(rest, token)
+}
+
+// declspec -> "int"
+func declspec(rest **Token, token *Token) *Type {
+	*rest = skip(token, "int")
+	return tpint
+}
+
+func consume(rest **Token, token *Token, lexeme string) bool {
+	if equal(token, lexeme) {
+		*rest = token.next
+		return true
+	}
+	*rest = token
+	return false
+}
+
+// declarator -> "*"* ident
+func declarator(rest **Token, token *Token, tp *Type) *Type {
+	for consume(&token, token, "*") {
+		tp = ptrto(tp)
+	}
+	if token.kind != IDENT {
+		locate(token.begin, token.length)
+		fmt.Fprintln(os.Stderr, "\033[31mexpected a variable name\033[0m")
+		os.Exit(1)
+	}
+	tp.name = token
+	*rest = token.next
+	return tp
+}
+
+func getIdent(token *Token) string {
+	if token.kind != IDENT {
+		locate(token.begin, token.length)
+		fmt.Fprintln(os.Stderr, "\033[31mexpected an identifier\033[0m")
+		os.Exit(1)
+	}
+	return token.lexeme
+}
+
+// declaration -> declspec (declarator ( "=" expr )?) ( "," declarator ( "=" expr )?)* ";"
+func declaration(rest **Token, token *Token) *Node {
+	baseType := declspec(&token, token)
+	head := Node{}
+	curr := &head
+	var tp *Type
+	var init *Node
+	var variable *Object
+	tp = declarator(&token, token, baseType)
+	variable = NewLvar(getIdent(tp.name), tp)
+	if equal(token, "=") {
+		token = skip(token, "=")
+		init = expr(&token, token)
+	}
+	if init == nil {
+		curr.next = NewUnary(NodeExprStmt, NewVar(variable, tp.name), token)
+		curr = curr.next
+	} else {
+		curr.next = NewUnary(NodeExprStmt, NewBinary(NodeAsg, NewVar(variable, tp.name), init, token), token)
+		curr = curr.next
+	}
+	for token.kind != EOF && !equal(token, ";") {
+		token = skip(token, ",")
+		tp = declarator(&token, token, baseType)
+		variable = NewLvar(getIdent(tp.name), tp)
+		if !equal(token, "=") {
+			init = nil
+		} else {
+			token = skip(token, "=")
+			init = expr(&token, token)
+		}
+		if init == nil {
+			curr.next = NewUnary(NodeExprStmt, NewVar(variable, tp.name), token)
+			curr = curr.next
+		} else {
+			curr.next = NewUnary(NodeExprStmt, NewBinary(NodeAsg, NewVar(variable, tp.name), init, token), token)
+			curr = curr.next
+		}
+	}
+	node := NewNode(NodeBlock, token)
+	node.body = head.next
+	*rest = skip(token, ";")
+	return node
 }
 
 // block -> stmt* "}"
@@ -362,7 +465,7 @@ func relational(rest **Token, token *Token) (node *Node) {
 	}
 }
 
-// addsub -> muldiv ( "+" muldiv | "/" muldiv )*
+// addsub -> muldiv ( "+" muldiv | "-" muldiv )*
 func addsub(rest **Token, token *Token) (node *Node) {
 	node = muldiv(&token, token)
 	for {
@@ -433,7 +536,9 @@ func primary(rest **Token, token *Token) (node *Node) {
 	if token.kind == IDENT {
 		variable := findVar(token)
 		if variable == nil {
-			variable = NewLvar(token.lexeme)
+			locate(token.begin, token.length)
+			fmt.Fprintln(os.Stderr, "\033[31mundefined variable\033[0m")
+			os.Exit(1)
 		}
 		*rest = token.next
 		node = NewVar(variable, token)
