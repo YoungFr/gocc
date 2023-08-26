@@ -9,7 +9,7 @@ import (
 func locate(begin int, length int) {
 	fmt.Fprintln(os.Stderr, source)
 	if length == 0 {
-		length++
+		length = 1
 	}
 	fmt.Fprintf(os.Stderr, "%*s\033[31m%s \033[0m", begin, "", strings.Repeat("^", length))
 }
