@@ -1,2 +1,2 @@
 # gocc
-A Go implementation of chibicc
+A Go C Compiler
